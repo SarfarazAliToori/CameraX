@@ -14,7 +14,6 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
-import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -28,6 +27,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
 
+    // for camera changing back and front
+    var cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+    // isOnFlash
+    var isOnFlash : Boolean = false
+    lateinit var cameraProvider : ProcessCameraProvider
+
     companion object {
         private const val TAG = "CameraXBasic"
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
@@ -39,6 +44,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         supportActionBar?.hide()
+
+        //front camera
+        changeCamera()
+        // Flash on off
+        flash()
 
         // Request camera permissions
         if (allPermissionsGranted()) {
@@ -93,7 +103,7 @@ class MainActivity : AppCompatActivity() {
 
         cameraProviderFuture.addListener(Runnable {
             // Used to bind the lifecycle of cameras to the lifecycle owner
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+            cameraProvider = cameraProviderFuture.get()
 
             // Preview
             val preview = Preview.Builder()
@@ -102,22 +112,34 @@ class MainActivity : AppCompatActivity() {
                     it.setSurfaceProvider(viewFinder.surfaceProvider)
                 }
 
+            imageCapture = ImageCapture.Builder()
+                .build()
+
             // Select back camera as a default
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            // declared globaly for back and front camera
+           // val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
                 // Unbind use cases before rebinding
                 cameraProvider.unbindAll()
 
                 // Bind use cases to camera
-                cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview)
+//                cameraProvider.bindToLifecycle(
+//                   this, cameraSelector, preview, imageCapture)
+                // for flash on or off
+               val myCamera =  cameraProvider.bindToLifecycle(
+                    this, cameraSelector, preview, imageCapture)
+
+                myCamera.cameraInfo.hasFlashUnit()
+                myCamera.cameraControl.enableTorch(isOnFlash)
 
             } catch(exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
 
         }, ContextCompat.getMainExecutor(this))
+
+
 
     } // end of startCamera
 
@@ -155,9 +177,42 @@ class MainActivity : AppCompatActivity() {
     } // end of on RequestPermissionsResult()
 
 
+    //////////// change camera front or back.
+    fun changeCamera() {
+        btn_change_camera.setOnClickListener {
+            if (cameraSelector == CameraSelector.DEFAULT_FRONT_CAMERA) {
+                cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                startCamera()
+            } else if (cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA) {
+                cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+                startCamera()
+            }
+        }
+    }
 
+    // on flash light of camera
+    fun flash() {
+        btn_camera_flash.setOnClickListener {
+            try {
+                if (isOnFlash == true) {
+                    isOnFlash = false
+                    val myCamera =  cameraProvider.bindToLifecycle(
+                        this, cameraSelector, imageCapture)
 
+                    myCamera.cameraInfo.hasFlashUnit()
+                    myCamera.cameraControl.enableTorch(isOnFlash)
+                } else if (isOnFlash == false) {
+                    isOnFlash = true
+                    val myCamera =  cameraProvider.bindToLifecycle(
+                        this, cameraSelector, imageCapture)
 
-
+                    myCamera.cameraInfo.hasFlashUnit()
+                    myCamera.cameraControl.enableTorch(isOnFlash)
+                }
+            } catch (e : Exception) {
+                Log.i("TAG", "Errrrrrrrrrrrrrrr : $e")
+            }
+        }
+    }
 
 }
